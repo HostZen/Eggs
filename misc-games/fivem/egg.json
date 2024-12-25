@@ -1,0 +1,72 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2024-12-25T22:46:03+00:00",
+    "name": "FiveM",
+    "author": "support@hostzen.net",
+    "description": "A FiveM egg that takes Blueprint extensions into account and removes irrelevant config values.",
+    "features": null,
+    "docker_images": {
+        "ghcr.io\/parkervcp\/yolks:debian": "ghcr.io\/parkervcp\/yolks:debian"
+    },
+    "file_denylist": [],
+    "startup": "$(pwd)\/alpine\/opt\/cfx-server\/ld-musl-x86_64.so.1 --library-path \"$(pwd)\/alpine\/usr\/lib\/v8\/:$(pwd)\/alpine\/lib\/:$(pwd)\/alpine\/usr\/lib\/\" -- $(pwd)\/alpine\/opt\/cfx-server\/FXServer +set citizen_dir $(pwd)\/alpine\/opt\/cfx-server\/citizen\/ +set sv_licenseKey {{FIVEM_LICENSE}} +set sv_maxplayers {{MAX_PLAYERS}} +set txAdminPort {{PORT_TXADMIN}} $( [ \"$ENABLE_TXADMIN\" == \"1\" ] && printf %s '+set serverProfile default' || printf %s '+exec server.cfg' )",
+    "config": {
+        "files": "{\r\n    \"server.cfg\": {\r\n        \"parser\": \"file\",\r\n        \"find\": {\r\n            \"endpoint_add_tcp\": \"endpoint_add_tcp \\\"0.0.0.0:{{server.build.default.port}}\\\"\",\r\n            \"endpoint_add_udp\": \"endpoint_add_udp \\\"0.0.0.0:{{server.build.default.port}}\\\"\",\r\n            \"set sv_licenseKey\": \"set sv_licenseKey {{server.build.env.FIVEM_LICENSE}}\",\r\n            \"sv_maxclients\": \"sv_maxclients {{server.build.env.MAX_PLAYERS}}\"\r\n        }\r\n    }\r\n}",
+        "startup": "{\r\n    \"done\": \"succeeded. Welcome!\"\r\n}",
+        "logs": "{}",
+        "stop": "^C"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!\/bin\/bash\r\n\r\n# FiveM Installation Script\r\n# HostZen (c) 2024. All rights reserved.\r\n# Jack Perry <jack@hostzen.net>\r\n\r\n# Update system & install deps\r\napt update -y\r\napt install -y xz-utils jq\r\n\r\n\r\n# Update default server resources\r\ncd \/mnt\/server\r\nmkdir -p \/mnt\/server\/resources\r\n\r\necho \"updating citizenfx resource files\"\r\ngit clone https:\/\/github.com\/citizenfx\/cfx-server-data.git \/tmp\r\ncp -Rf \/tmp\/resources\/* resources\/\r\n\r\n\r\n# Prepare FiveM Server Binary\r\nCHANGELOGS_PAGE=$(curl -sSL https:\/\/changelogs-live.fivem.net\/api\/changelog\/versions\/linux\/server)\r\nLATEST_VERSION=$(echo $CHANGELOGS_PAGE | jq -r '.latest_download')\r\n\r\nif [ ! -z \"${LATEST_VERSION}\" ]; then\r\n  if curl --output \/dev\/null --silent --head --fail ${LATEST_VERSION}; then\r\n    echo -e \"link is valid. setting download link to ${LATEST_VERSION}\"\r\n    DOWNLOAD_LINK=${LATEST_VERSION}\r\n  else\r\n    echo -e \"link is invalid closing out\"\r\n    exit 2\r\n  fi\r\nfi\r\n\r\n\r\n# Download the latest version of the FiveM server (we allow users to change via the panel later)\r\necho -e \"Running curl -sSL ${LATEST_VERSION} -o ${LATEST_VERSION##*\/}\"\r\ncurl -sSL ${LATEST_VERSION} -o ${LATEST_VERSION##*\/}\r\n\r\n\r\n# Extract the FiveM server\r\necho \"Extracting fivem files\"\r\ntar xf ${LATEST_VERSION##*\/}\r\nrm -rf ${LATEST_VERSION##*\/} run.sh # Delete the tar file and the run.sh file to prevent any issues\r\n\r\n\r\n# Download default server config\r\nif [ -e server.cfg ]; then\r\n  echo \"Skipping downloading default server config file as one already exists\"\r\nelse\r\n  echo \"Downloading default fivem config\"\r\n  curl https:\/\/raw.githubusercontent.com\/HostZen\/Eggs\/refs\/heads\/main\/misc-games\/fivem\/server.cfg >> server.cfg\r\nfi\r\n\r\n\r\n# Echo\r\necho \"FiveM server has been installed successfully!\"",
+            "container": "ghcr.io\/parkervcp\/installers:debian",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "txAdmin Port",
+            "description": "Port that txAdmin runs on - this is set by HostZen's automatic system, if there are any issues please contact support!",
+            "env_variable": "PORT_TXADMIN",
+            "default_value": "40120",
+            "user_viewable": true,
+            "user_editable": false,
+            "rules": "max:6",
+            "field_type": "text"
+        },
+        {
+            "name": "Enable txAdmin?",
+            "description": "txAdmin is enabled by default. If you don't want to use txAdmin, you can disable it here.",
+            "env_variable": "ENABLE_TXADMIN",
+            "default_value": "1",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean|max:1",
+            "field_type": "text"
+        },
+        {
+            "name": "FiveM License Key",
+            "description": "Gain your license key from https:\/\/keymaster.fivem.net",
+            "env_variable": "FIVEM_LICENSE",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "max:33",
+            "field_type": "text"
+        },
+        {
+            "name": "Max Players",
+            "description": "Set your server's max player-count",
+            "env_variable": "MAX_PLAYERS",
+            "default_value": "48",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "integer",
+            "field_type": "text"
+        }
+    ]
+}
