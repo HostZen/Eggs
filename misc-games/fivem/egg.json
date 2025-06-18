@@ -4,68 +4,160 @@
         "version": "PTDL_v2",
         "update_url": null
     },
-    "exported_at": "2024-12-25T22:46:03+00:00",
+    "exported_at": "2025-06-18T09:10:13+00:00",
     "name": "FiveM",
     "author": "support@hostzen.net",
-    "description": "A FiveM egg that takes Blueprint extensions into account and removes irrelevant config values.",
+    "description": "A FiveM Egg with Git support.",
     "features": null,
     "docker_images": {
-        "ghcr.io\/parkervcp\/yolks:debian": "ghcr.io\/parkervcp\/yolks:debian"
+        "HostZen - FiveM": "ghcr.io\/parkervcp\/yolks:debian"
     },
-    "file_denylist": [],
-    "startup": "$(pwd)\/alpine\/opt\/cfx-server\/ld-musl-x86_64.so.1 --library-path \"$(pwd)\/alpine\/usr\/lib\/v8\/:$(pwd)\/alpine\/lib\/:$(pwd)\/alpine\/usr\/lib\/\" -- $(pwd)\/alpine\/opt\/cfx-server\/FXServer +set citizen_dir $(pwd)\/alpine\/opt\/cfx-server\/citizen\/ +set sv_licenseKey {{FIVEM_LICENSE}} +set sv_maxplayers {{MAX_PLAYERS}} +set txAdminPort {{PORT_TXADMIN}} $( [ \"$ENABLE_TXADMIN\" == \"1\" ] && printf %s '+set serverProfile default' || printf %s '+exec server.cfg' )",
+    "file_denylist": [
+        "alpine\/"
+    ],
+    "startup": "[ \"$GIT_PULL_ENABLE\" == \"1\" ] && [ -n \"$GIT_REPO_HOST\" ] && [ -n \"$GIT_REPO_OWNER\" ] && [ -n \"$GIT_REPO_NAME\" ] && [ -n \"$GIT_REPO_BRANCH\" ] && [ -n \"$GIT_AUTH_USERNAME\" ] && [ -n \"$GIT_AUTH_TOKEN\" ] && REPO_URL=\"https:\/\/${GIT_AUTH_USERNAME}:${GIT_AUTH_TOKEN}@${GIT_REPO_HOST}\/${GIT_REPO_OWNER}\/${GIT_REPO_NAME}.git\" && ( [ ! -d \"$GIT_REPO_NAME\" ] && git clone -b \"$GIT_REPO_BRANCH\" \"$REPO_URL\" >>git.log 2>&1 || ( cd \"$GIT_REPO_NAME\" && git pull origin \"$GIT_REPO_BRANCH\" >>..\/git.log 2>&1 ) ) || echo \"[WARN] Skipping git pull: missing variables or pull failed. See git.log for details.\"; $(pwd)\/alpine\/opt\/cfx-server\/ld-musl-x86_64.so.1 --library-path \"$(pwd)\/alpine\/usr\/lib\/v8\/:$(pwd)\/alpine\/lib\/:$(pwd)\/alpine\/usr\/lib\/\" -- $(pwd)\/alpine\/opt\/cfx-server\/FXServer +set citizen_dir $(pwd)\/alpine\/opt\/cfx-server\/citizen\/ +set serverProfile default $([ \"$TXHOST_TXA_ENABLE\" == \"1\" ] || printf %s '+exec server.cfg')",
     "config": {
-        "files": "{\r\n    \"server.cfg\": {\r\n        \"parser\": \"file\",\r\n        \"find\": {\r\n            \"endpoint_add_tcp\": \"endpoint_add_tcp \\\"0.0.0.0:{{server.build.default.port}}\\\"\",\r\n            \"endpoint_add_udp\": \"endpoint_add_udp \\\"0.0.0.0:{{server.build.default.port}}\\\"\",\r\n            \"set sv_licenseKey\": \"set sv_licenseKey {{server.build.env.FIVEM_LICENSE}}\",\r\n            \"sv_maxclients\": \"sv_maxclients {{server.build.env.MAX_PLAYERS}}\"\r\n        }\r\n    }\r\n}",
+        "files": "{\r\n    \"server.cfg\": {\r\n        \"parser\": \"file\",\r\n        \"find\": {\r\n            \"endpoint_add_tcp\": \"endpoint_add_tcp \\\"0.0.0.0:{{server.build.default.port}}\\\"\",\r\n            \"endpoint_add_udp\": \"endpoint_add_udp \\\"0.0.0.0:{{server.build.default.port}}\\\"\"\r\n        }\r\n    }\r\n}",
         "startup": "{\r\n    \"done\": \"succeeded. Welcome!\"\r\n}",
         "logs": "{}",
-        "stop": "^C"
+        "stop": "quit"
     },
     "scripts": {
         "installation": {
-            "script": "#!\/bin\/bash\r\n\r\n# FiveM Installation Script\r\n# HostZen (c) 2024. All rights reserved.\r\n# Jack Perry <jack@hostzen.net>\r\n\r\n# Update system & install deps\r\napt update -y\r\napt install -y xz-utils jq\r\n\r\n\r\n# Update default server resources\r\ncd \/mnt\/server\r\nmkdir -p \/mnt\/server\/resources\r\n\r\necho \"updating citizenfx resource files\"\r\ngit clone https:\/\/github.com\/citizenfx\/cfx-server-data.git \/tmp\r\ncp -Rf \/tmp\/resources\/* resources\/\r\n\r\n\r\n# Prepare FiveM Server Binary\r\nCHANGELOGS_PAGE=$(curl -sSL https:\/\/changelogs-live.fivem.net\/api\/changelog\/versions\/linux\/server)\r\nLATEST_VERSION=$(echo $CHANGELOGS_PAGE | jq -r '.latest_download')\r\n\r\nif [ ! -z \"${LATEST_VERSION}\" ]; then\r\n  if curl --output \/dev\/null --silent --head --fail ${LATEST_VERSION}; then\r\n    echo -e \"link is valid. setting download link to ${LATEST_VERSION}\"\r\n    DOWNLOAD_LINK=${LATEST_VERSION}\r\n  else\r\n    echo -e \"link is invalid closing out\"\r\n    exit 2\r\n  fi\r\nfi\r\n\r\n\r\n# Download the latest version of the FiveM server (we allow users to change via the panel later)\r\necho -e \"Running curl -sSL ${LATEST_VERSION} -o ${LATEST_VERSION##*\/}\"\r\ncurl -sSL ${LATEST_VERSION} -o ${LATEST_VERSION##*\/}\r\n\r\n\r\n# Extract the FiveM server\r\necho \"Extracting fivem files\"\r\ntar xf ${LATEST_VERSION##*\/}\r\nrm -rf ${LATEST_VERSION##*\/} run.sh # Delete the tar file and the run.sh file to prevent any issues\r\n\r\n\r\n# Download default server config\r\nif [ -e server.cfg ]; then\r\n  echo \"Skipping downloading default server config file as one already exists\"\r\nelse\r\n  echo \"Downloading default fivem config\"\r\n  curl https:\/\/raw.githubusercontent.com\/HostZen\/Eggs\/refs\/heads\/main\/misc-games\/fivem\/server.cfg >> server.cfg\r\nfi\r\n\r\n\r\n# Echo\r\necho \"FiveM server has been installed successfully!\"",
+            "script": "#!\/bin\/bash\r\n\r\n# FiveM Installation Script\r\n# HostZen (c) 2025. All rights reserved.\r\n# Jack Perry <jack@hostzen.net>\r\n\r\n## Update Apt\r\napt update -y\r\napt install -y jq curl tar xz-utils sed grep\r\n\r\n# Hardcoded variables\r\nCHANGELOGS_PAGE=$(curl -sSL https:\/\/changelogs-live.fivem.net\/api\/changelog\/versions\/linux\/server)\r\nRELEASE_PAGE=$(curl -sSL https:\/\/runtime.fivem.net\/artifacts\/fivem\/build_proot_linux\/master\/)\r\n\r\nCRITIAL_VERSION=$(echo $CHANGELOGS_PAGE | jq -r '.critical_download')\r\nRECOMMENDED_VERSION=$(echo $CHANGELOGS_PAGE | jq -r '.recommended_download')\r\nOPTIONAL_VERSION=$(echo $CHANGELOGS_PAGE | jq -r '.optional_download')\r\nLATEST_VERSION=$(echo $CHANGELOGS_PAGE | jq -r '.latest_download')\r\n\r\nDOWNLOAD_LINK=\"\"\r\nFIVEM_VERSION=${FIVEM_VERSION:-recommended}\r\n\r\n# Get the download link based on the FIVEM_VERSION environment variable\r\ncase \"${FIVEM_VERSION}\" in\r\n  \"recommended\")\r\n    DOWNLOAD_LINK=$RECOMMENDED_VERSION\r\n    ;;\r\n  \"latest\")\r\n    DOWNLOAD_LINK=$LATEST_VERSION\r\n    ;;\r\n  \"critical\")\r\n    DOWNLOAD_LINK=$CRITIAL_VERSION\r\n    ;;\r\n  \"optional\")\r\n    DOWNLOAD_LINK=$OPTIONAL_VERSION\r\n    ;;\r\n  *)\r\n    # Extract the version link containing the specified FIVEM_VERSION\r\n    VERSION_LINK=$(echo -e \"${RELEASE_PAGE}\" | grep -Eo '\".*\/*.tar.xz\"' | sed 's\/\\\"\/\/g' | sed 's\/\\.\\\/\/\/1' | grep -i \"${FIVEM_VERSION}\" | grep -o '=.*' | tr -d '=')\r\n    if [[ -z \"${VERSION_LINK}\" ]]; then\r\n      echo \"[WARN] Version specified does not exist on releases page. Defaulting to latest server artifact.\"\r\n      DOWNLOAD_LINK=$LATEST_VERSION\r\n    else\r\n      DOWNLOAD_LINK=\"https:\/\/runtime.fivem.net\/artifacts\/fivem\/build_proot_linux\/master\/${VERSION_LINK}\"\r\n    fi\r\n    ;;\r\nesac\r\n\r\necho \"Using download link: ${DOWNLOAD_LINK}\"\r\n\r\n# Check if DOWNLOAD_URL environment variable is set\r\nif [ -n \"${DOWNLOAD_URL}\" ]; then\r\n  # Validate that the URL is accessible using curl\r\n  if curl --output \/dev\/null --silent --head --fail \"${DOWNLOAD_URL}\"; then\r\n    echo \"Link is valid. Using the download link.\"\r\n  else\r\n    echo \"Error: Provided download URL is invalid. Exiting.\"\r\n    exit 2\r\n  fi\r\nfi\r\n\r\necho -e \"Running curl -sSL ${DOWNLOAD_LINK} -o ${DOWNLOAD_LINK##*\/}\"\r\ncd \/mnt\/server\r\ncurl -sSL ${DOWNLOAD_LINK} -o ${DOWNLOAD_LINK##*\/}\r\n\r\necho \"Extracting fivem files\"\r\nFILE_NAME=${DOWNLOAD_LINK##*\/}\r\n\r\n# Extract the tar.xz file\r\ntar -xf $FILE_NAME\r\n\r\n# Check if extraction was successful\r\nif [ $? -eq 0 ]; then\r\n  echo \"Successfully extracted $FILE_NAME\"\r\nelse\r\n  echo \"Failed to extract $FILE_NAME\"\r\n  exit 1\r\nfi\r\n\r\n# Remove unused files\r\nrm -rf ${DOWNLOAD_LINK##*\/} run.sh\r\n\r\n\r\n# If TXADMIN_ENABLE is 1, return now and exit\r\nif [ \"${TXADMIN_ENABLE}\" == \"1\" ]; then\r\n  echo \"Skipping resource download as txAdmin is enabled\"\r\n  exit 0\r\nfi \r\n\r\n# If txAdmin is not enabled, download the resources\r\nmkdir -p \/mnt\/server\/{resources,logs}\r\n\r\necho \"Downloading default CitizenFX resources\"\r\ngit clone https:\/\/github.com\/citizenfx\/cfx-server-data.git \/tmp\r\ncp -Rf \/tmp\/resources\/* resources\/[cfx]\/\r\nrm -rf \/tmp\/cfx-server-data\r\n\r\n# Download the default server config file if it does not exist\r\nif [ -e server.cfg ]; then\r\n  echo \"Skipping downloading default server.cfg as it already exists\"\r\nelse\r\n  echo \"Downloading default FXServer config file\"\r\n  curl -o server.cfg https:\/\/raw.githubusercontent.com\/parkervcp\/eggs\/master\/game_eggs\/gta\/fivem\/server.cfg\r\nfi\r\n\r\necho \"Install complete\"",
             "container": "ghcr.io\/parkervcp\/installers:debian",
             "entrypoint": "bash"
         }
     },
     "variables": [
         {
-            "name": "txAdmin Port",
-            "description": "Port that txAdmin runs on - this is set by HostZen's automatic system, if there are any issues please contact support!",
-            "env_variable": "PORT_TXADMIN",
+            "name": "FiveM - Artifact Version",
+            "description": "The server artifact version to use. Options: latest, recommended, critical, optional or a specific version number.\r\nDefaults to latest if not set or invalid.\r\n\r\nYou can get find build numbers at https:\/\/runtime.fivem.net\/artifacts\/fivem\/build_proot_linux\/master\/",
+            "env_variable": "FIVEM_VERSION",
+            "default_value": "latest",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:30",
+            "field_type": "text"
+        },
+        {
+            "name": "txAdmin - Port",
+            "description": "The port for the txAdmin panel",
+            "env_variable": "TXHOST_TXA_PORT",
             "default_value": "40120",
             "user_viewable": true,
             "user_editable": false,
-            "rules": "max:6",
+            "rules": "required|string|max:5",
             "field_type": "text"
         },
         {
-            "name": "Enable txAdmin?",
-            "description": "txAdmin is enabled by default. If you don't want to use txAdmin, you can disable it here.",
-            "env_variable": "ENABLE_TXADMIN",
+            "name": "txAdmin - Enable?",
+            "description": "Enable or disable the txAdmin panel for server management.",
+            "env_variable": "TXHOST_TXA_ENABLE",
             "default_value": "1",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "required|boolean|max:1",
+            "rules": "required|boolean",
             "field_type": "text"
         },
         {
-            "name": "FiveM License Key",
-            "description": "Gain your license key from https:\/\/keymaster.fivem.net",
-            "env_variable": "FIVEM_LICENSE",
+            "name": "Git - Pull from Git?",
+            "description": "Enable or disable pulling the latest files from a Git repository on server start.",
+            "env_variable": "GIT_PULL_ENABLE",
+            "default_value": "0",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|boolean",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Repository - Host",
+            "description": "The host of the git repository.\nWe pull via SSH, and assume git@host.com - so for example, git@github.com:UserName\/RepositoryName.git if you enter `github.com` here.\n\nIf you have any issues, please contact support.",
+            "env_variable": "GIT_REPO_HOST",
+            "default_value": "github.com",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "max:250",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Auth - Username",
+            "description": "The username to authenticate with Git.\r\nThe username specified must have access to the repository.",
+            "env_variable": "GIT_AUTH_USERNAME",
             "default_value": "",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "max:33",
+            "rules": "max:50",
             "field_type": "text"
         },
         {
-            "name": "Max Players",
-            "description": "Set your server's max player-count",
-            "env_variable": "MAX_PLAYERS",
-            "default_value": "48",
+            "name": "Git Auth - Access Token",
+            "description": "The Access Token for the user specified.\r\nIf you use GitHub, you can create a Personal Access Token (PAT) with the necessary permissions at https:\/\/github.com\/settings\/personal-access-tokens\/new.",
+            "env_variable": "GIT_AUTH_TOKEN",
+            "default_value": "",
             "user_viewable": true,
             "user_editable": true,
-            "rules": "integer",
+            "rules": "max:150",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Repository - Owner",
+            "description": "The name of the organisation or account that owns the repo.\nFor example, if the repo is HostZen\/Eggs, enter `HostZen` here.",
+            "env_variable": "GIT_REPO_OWNER",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Repository - Name",
+            "description": "The name of the git repository.",
+            "env_variable": "GIT_REPO_NAME",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Git Repository - Branch",
+            "description": "The branch to pull from the Git repository.\r\nDefaults to main if not set. Ensure the branch exists in the repository.",
+            "env_variable": "GIT_REPO_BRANCH",
+            "default_value": "main",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "max:100",
+            "field_type": "text"
+        },
+        {
+            "name": "Admin - TX Game Name",
+            "description": "[Admin only] Restricts txAdmin templates to FiveM",
+            "env_variable": "TXHOST_GAME_NAME",
+            "default_value": "fivem",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|string|max:5",
+            "field_type": "text"
+        },
+        {
+            "name": "Admin - TX Provider Name",
+            "description": "[Admin only] Changes branding in the txAdmin UI.",
+            "env_variable": "TXHOST_PROVIDER_NAME",
+            "default_value": "HostZen",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|string|max:20",
+            "field_type": "text"
+        },
+        {
+            "name": "Admin - TX Provider Logo",
+            "description": "[Admin only] Changes branding in the txAdmin UI.",
+            "env_variable": "TXHOST_PROVIDER_LOGO",
+            "default_value": "https:\/\/hostzen.net\/images\/brand\/logo.png",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": "required|string|max:150",
             "field_type": "text"
         }
     ]

@@ -81,8 +81,8 @@ fi
 rm -rf ${DOWNLOAD_LINK##*/} run.sh
 
 
-# If TXADMIN_ENABLE is 1, return now and exit
-if [ "${TXADMIN_ENABLE}" == "1" ]; then
+# If TXHOST_TXA_ENABLE (txAdmin is enabled) is 1, return now and exit
+if [ "${TXHOST_TXA_ENABLE}" == "1" ]; then
   echo "Skipping resource download as txAdmin is enabled"
   exit 0
 fi 
